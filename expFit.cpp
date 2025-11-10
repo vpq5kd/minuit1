@@ -80,6 +80,19 @@ double calcNLL(TH1F* h, TF1* f){
   return 2*nll;   // factor of 2 so the 1 sigma error contours follow the chi^2 convention
 }
 
+//utilized chatGPT to aid with creating the chi^two function
+double calcChi2(TH1F *h, TF1 *f){
+	double chi2 = 0.0;
+	for (int i = 1; i <= h->GetNbinsX(); i++){
+		double x = h->GetBinCenter(i);
+		double y_o = h->GetBinContent(i);
+		double y_e = f->Eval(x);
+		double err = h->GetBinError(i);
+
+		chi2+= pow((y_o - y_e)/err,2);
+	}
+	return chi2;
+}
 
 //-------------------------------------------------------------------------
 // Minuit fcn: calculates value of the function to be minimized using
@@ -98,7 +111,7 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag){
     fparam->SetParameter(i,par[i]);
   }
 
-  f = calcNLL(hdata,fparam);
+  f = calcChi2(hdata,fparam);
  
 }
 
@@ -211,7 +224,7 @@ int main(int argc, char **argv) {
   myfunc->SetLineWidth(2);
 
   myfunc->GetXaxis()->SetTitle("x");
-  myfunc->GetYaxis()->SetTitle("f(x;#lambda)");
+  myfunc->GetYaxis()->SetTitle("f(x; fit from #chi^{2})");
 
   // Plot the result.
   hdata->Draw("e");
@@ -222,7 +235,7 @@ int main(int argc, char **argv) {
   double fmin, fedm, errdef;
   int npari, nparx, istat;  // see https://root.cern/doc/master/classTMinuit.html 
   minuit.mnstat(fmin, fedm, errdef, npari, nparx, istat);
-  cout << "minimum of NLL = " << fmin << endl;
+  cout << "minimum of chi^2 = " << fmin << endl;
   cout << "fit status = " << istat << endl;
   cout << "best fit parameters\n" <<endl;
   for (int i=0; i<npar; ++i){
