@@ -40,6 +40,7 @@
 #include <TAxis.h>
 #include <TLine.h>
 #include <TFile.h>
+#include <TLatex.h>
 using namespace std;
 
 // ---------- GLOBALS ----------
@@ -183,7 +184,9 @@ int main(int argc, char **argv) {
     minuit1.GetParameter(i,outpar1[i],err1[i]);
   };
   gauss2->SetParameters(outpar1);
-
+  double fmin1, fedm1, errdef1; 
+  int npari1, nparx1, istat1;
+  minuit1.mnstat(fmin1, fedm1, errdef1, npari1, nparx1, istat1);
 
   const int npar2 = 3;
   TF1 * gumbel = new TF1("gumbel", gumbelPDF, xmin, xmax, npar2);
@@ -209,6 +212,20 @@ int main(int argc, char **argv) {
   	minuit2.GetParameter(i, outpar2[i], err2[i]);
   } 
   gumbel->SetParameters(outpar2);
+  double fmin2, fedm2, errdef2; 
+  int npari2, nparx2, istat2;
+  minuit2.mnstat(fmin2, fedm2, errdef2, npari2, nparx2, istat2);
+
+  int nbins = hdata->GetNbinsX();
+  int ndf_gauss = nbins - npar1;
+  int ndf_gumbel = nbins - npar2;
+
+  double chi2_gauss = calcChi2(hdata, gauss2);
+  double chi2_gumbel = calcChi2(hdata, gumbel);
+
+  double p_gauss = TMath::Prob(chi2_gauss, ndf_gauss);
+  double p_gumbel = TMath::Prob(chi2_gumbel, ndf_gumbel);
+
    TH1F *hdata1 = (TH1F*)hdata->Clone("hdata1");
    TH1F *hdata2 = (TH1F*)hdata->Clone("hdata2");
   canvas->Divide(2,1);
@@ -219,13 +236,26 @@ int main(int argc, char **argv) {
   gauss2->SetLineColor(kBlue);
   gauss2->SetLineWidth(2);
   gauss2->Draw("same");
-  gPad->SetGrid();
-
-
+  TLatex stats1;
+  stats1.SetNDC();
+  stats1.SetTextSize(0.04);
+  stats1.DrawLatex(0.55, 0.85, Form("#chi^{2} = %.2f", chi2_gauss));
+  stats1.DrawLatex(0.55, 0.80, Form("ndf = %d", ndf_gauss));
+  stats1.DrawLatex(0.55, 0.75, Form("p = %f", p_gauss));
   canvas->cd(2);
   hdata2->SetTitle("Fit Using the Gumbel Function");
   hdata2->Draw("E");
+  gumbel->SetLineColor(kPink);
+  gumbel->SetLineWidth(2);
   gumbel->Draw("same");
+
+  TLatex stats2;
+  stats2.SetNDC();
+  stats2.SetTextSize(0.04);
+  stats2.DrawLatex(0.55, 0.85, Form("#chi^{2} = %.2f", chi2_gumbel));
+  stats2.DrawLatex(0.55, 0.80, Form("ndf = %d", ndf_gumbel));
+  stats2.DrawLatex(0.55, 0.75, Form("p = %f", p_gumbel));
+ 
 
  theApp.SetIdleTimer(30,".q");  // set up a failsafe timer to end the program
   theApp.Run(true);
