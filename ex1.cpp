@@ -256,7 +256,7 @@ int main(int argc, char **argv) {
   stats2.DrawLatex(0.55, 0.80, Form("ndf = %d", ndf_gumbel));
   stats2.DrawLatex(0.55, 0.75, Form("p = %f", p_gumbel));
  
-
+  canvas->SaveAs("ex1_plots.png");
  theApp.SetIdleTimer(30,".q");  // set up a failsafe timer to end the program
   theApp.Run(true);
   canvas->Close();
