@@ -8,7 +8,7 @@
 
 -----
 
-Team member names and computing IDs: AAA(aaa) BBB(bbb)
+Team member names and computing IDs: Sophia Spaner (VPQ5KD)
 
 -----
 
