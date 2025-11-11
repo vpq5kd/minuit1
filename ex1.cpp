@@ -39,7 +39,7 @@
 #include <TString.h>
 #include <TAxis.h>
 #include <TLine.h>
-
+#include <TFile.h>
 using namespace std;
 
 // ---------- GLOBALS ----------
@@ -166,7 +166,7 @@ int main(int argc, char **argv) {
   TF1* gauss2 = new TF1("gauss2", doubleGauss, xmin, xmax, npar1);
   //used chatGPT to help with parameter guessing
   double par1[npar1] = {
-  	hdata->GetMaximum(), hdata->GetMean() -1, 0.5.
+  	hdata->GetMaximum(), hdata->GetMean() -1, 0.5,
 	hdata->GetMaximum()/2, hdata->GetMean() +1, 0.5
   };
   double stepSize1[npar1] = {.1,.1,.1,.1,.1,.1};
@@ -175,10 +175,10 @@ int main(int argc, char **argv) {
   TString parName1[npar1] = {"A1", "mu1", "sigma1", "A2","mu2","sigma2"};
 
   TMinuit minuit1(npar1);
-  minuit.SetFCN(fcn);
+  minuit1.SetFCN(fcn);
 
   hdata=hexp;     // histogram to fit
-  fparam=guass2;  // our model
+  fparam=gauss2;  // our model
 
   for (int i = 0; i<npar1; i++){
   	minuit1.DefineParameter(i, parName1[i].Data(), par1[i], stepSize1[i], minVal1[i], maxVal1[i]);
@@ -187,11 +187,11 @@ int main(int argc, char **argv) {
   minuit1.Migrad();       // Minuit's best minimization algorithm
 
   // Get the result
-  double outpar1[npar1], err[npar1];
+  double outpar1[npar1], err1[npar1];
   for (int i=0; i<npar1; i++){
     minuit1.GetParameter(i,outpar1[i],err1[i]);
-  }
-  gauss2->SetParameters(outpar);
+  };
+  gauss2->SetParameters(outpar1);
 
   gauss2->SetLineStyle(1);             //  1 = solid, 2 = dashed, 3 = dotted
   gauss2->SetLineColor(1);             //  black (default)
@@ -208,13 +208,13 @@ int main(int argc, char **argv) {
   cout << "\n==========================\n"<<endl;
   double fmin, fedm, errdef;
   int npari, nparx, istat;  // see https://root.cern/doc/master/classTMinuit.html 
-  minuit.mnstat(fmin, fedm, errdef, npari, nparx, istat);
+  minuit1.mnstat(fmin, fedm, errdef, npari, nparx, istat);
   cout << "minimum of chi^2 = " << fmin << endl;
   cout << "fit status = " << istat << endl;
   cout << "best fit parameters\n" <<endl;
   for (int i=0; i<npar1; ++i){
     cout << i << " : " << outpar1[i] << " +- " << err1[i] << endl;
-  }
+  };
 
   cout << "\nTo exit, quit ROOT from the File menu of the plot (or use control-C)" << endl;
   theApp.SetIdleTimer(30,".q");  // set up a failsafe timer to end the program
