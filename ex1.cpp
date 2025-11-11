@@ -62,8 +62,8 @@ double doubleGauss(double *xPtr, double par[]){
 	double A2 = par[3];
 	double mu2 = par[4];
 	double sigma2 = par[5];
-	return A1 * TMath::Gaus(x,mu1, sigma1, true)+
-		A2 * TMath::Gaus(x, mu2, sigma2, true);
+	return A1 * TMath::Gaus(x,mu1, sigma1, false)+
+		A2 * TMath::Gaus(x, mu2, sigma2, false);
 }
 
 double gumbelPDF(double *xPtr, double par[]){
@@ -101,22 +101,15 @@ double calcChi2(TH1F *h, TF1 *f){
 		double y_o = h->GetBinContent(i);
 		double y_e = f->Eval(x);
 		double err = h->GetBinError(i);
-
+		
+		if (err <= 0) err = sqrt(y_o + 1.0);
+		if (!std::isfinite(y_e)) continue;
 		chi2+= pow((y_o - y_e)/err,2);
 	}
 	return chi2;
 }
 
 //-------------------------------------------------------------------------
-// Minuit fcn: calculates value of the function to be minimized using
-// the data and the model function
-// This is the interface used to define our objective function.  We use
-// only a subset of the input parameters below.
-// npar: number of parameters
-// par: array of parameter values
-// f: the value of the objective function
-// Minuit can also pass the gradient(deriv) of the objective function wrt the
-// current parameters or flags that can trigger special operations (eg perform some initialization)
 
 void fcn(int& npar, double* deriv, double& f, double par[], int flag){
 
@@ -127,8 +120,6 @@ void fcn(int& npar, double* deriv, double& f, double par[], int flag){
   f = calcChi2(hdata,fparam);
  
 }
-
-//-------------------------------------------------------------------------
 
 int main(int argc, char **argv) {
 
@@ -161,15 +152,16 @@ int main(int argc, char **argv) {
   double xmin = hexp->GetXaxis()->GetXmin();
   double xmax = hexp->GetXaxis()->GetXmax();
 
-  
+  hdata = hexp;
+
+  hdata->Sumw2(); // -> chatGPT suggestion to fix non-fitting problem 
   const int npar1 = 6;
   TF1* gauss2 = new TF1("gauss2", doubleGauss, xmin, xmax, npar1);
   //used chatGPT to help with parameter guessing
   double par1[npar1] = {
-  	hdata->GetMaximum(), hdata->GetMean() -1, 0.5,
-	hdata->GetMaximum()/2, hdata->GetMean() +1, 0.5
+  	1.5e4, 80.0,3.5,.5e4,85.0,8.0
   };
-  double stepSize1[npar1] = {.1,.1,.1,.1,.1,.1};
+  double stepSize1[npar1] = {1e4,.1,.1,1e4,.1,.1};
   double minVal1[npar1] = {0,0,0,0,0,0};
   double maxVal1[npar1] = {0,0,0,0,0,0};
   TString parName1[npar1] = {"A1", "mu1", "sigma1", "A2","mu2","sigma2"};
@@ -177,7 +169,6 @@ int main(int argc, char **argv) {
   TMinuit minuit1(npar1);
   minuit1.SetFCN(fcn);
 
-  hdata=hexp;     // histogram to fit
   fparam=gauss2;  // our model
 
   for (int i = 0; i<npar1; i++){
@@ -193,31 +184,50 @@ int main(int argc, char **argv) {
   };
   gauss2->SetParameters(outpar1);
 
-  gauss2->SetLineStyle(1);             //  1 = solid, 2 = dashed, 3 = dotted
-  gauss2->SetLineColor(1);             //  black (default)
+
+  const int npar2 = 3;
+  TF1 * gumbel = new TF1("gumbel", gumbelPDF, xmin, xmax, npar2);
+
+  double par2[npar2] = {1.0e4, 80.0, 5.0};
+  double stepSize2[npar2] = {1e3, 0.1, 0.1};
+  double minVal2[npar2] = {0,0,0};
+  double maxVal2[npar2] = {0,0,0};
+  TString parName2[npar2] = {"A", "mu","beta"};
+
+  TMinuit minuit2(npar2);
+  minuit2.SetFCN(fcn);
+  fparam = gumbel; 
+
+  for(int i = 0; i<npar2; i++){
+  	minuit2.DefineParameter(i, parName2[i].Data(), par2[i], stepSize2[i], minVal2[i], maxVal2[i]);
+  }
+ 
+  minuit2.Migrad();
+
+  double outpar2[npar2], err2[npar2];
+  for (int i = 0; i < npar2; i++){
+  	minuit2.GetParameter(i, outpar2[i], err2[i]);
+  } 
+  gumbel->SetParameters(outpar2);
+   TH1F *hdata1 = (TH1F*)hdata->Clone("hdata1");
+   TH1F *hdata2 = (TH1F*)hdata->Clone("hdata2");
+  canvas->Divide(2,1);
+
+  canvas->cd(1);
+  hdata1->SetTitle("Fit Using the Sum of Two Gaussian Functions");
+  hdata1->Draw("E");
+  gauss2->SetLineColor(kBlue);
   gauss2->SetLineWidth(2);
-
-  gauss2->GetXaxis()->SetTitle("x");
-  gauss2->GetYaxis()->SetTitle("f(x; fit from #chi^{2})");
-
-  // Plot the result.
-  hdata->Draw("e");
   gauss2->Draw("same");
+  gPad->SetGrid();
 
-  // summarize the fitting results
-  cout << "\n==========================\n"<<endl;
-  double fmin, fedm, errdef;
-  int npari, nparx, istat;  // see https://root.cern/doc/master/classTMinuit.html 
-  minuit1.mnstat(fmin, fedm, errdef, npari, nparx, istat);
-  cout << "minimum of chi^2 = " << fmin << endl;
-  cout << "fit status = " << istat << endl;
-  cout << "best fit parameters\n" <<endl;
-  for (int i=0; i<npar1; ++i){
-    cout << i << " : " << outpar1[i] << " +- " << err1[i] << endl;
-  };
 
-  cout << "\nTo exit, quit ROOT from the File menu of the plot (or use control-C)" << endl;
-  theApp.SetIdleTimer(30,".q");  // set up a failsafe timer to end the program
+  canvas->cd(2);
+  hdata2->SetTitle("Fit Using the Gumbel Function");
+  hdata2->Draw("E");
+  gumbel->Draw("same");
+
+ theApp.SetIdleTimer(30,".q");  // set up a failsafe timer to end the program
   theApp.Run(true);
   canvas->Close();
 
