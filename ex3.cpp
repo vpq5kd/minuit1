@@ -158,7 +158,7 @@ int main(int argc, char **argv) {
   TF2* fitfunc  = new TF2("fitfunc", gauss2D, xmin, xmax, ymin, ymax, npar);
   TString names[npar] = {"A", "mux", "sigx", "muy","sigy", "cbkg"};
   double par[npar] = {50, 3.4, 1.2, 2.0, 1.4, .4};
-  double stepSize[npar] = {0,0,0,0,0,0};
+  double stepSize[npar] = {1,.1,.1,.1,.1,.01};
 
   TMinuit minuit1(npar);
   minuit1.SetFCN(fcn);
@@ -224,10 +224,13 @@ int main(int argc, char **argv) {
   hsub->Draw("lego2");
 
   tc->SaveAs("ex3_fig.png");
-  theApp.SetIdleTimer(30,".q");  // set up a failsafe timer to end the program
+
+  for (int i = 0; i<npar;i++){
+  	std::cout << names[i] << "=" << outpar1[i] << "+/-" << err1[i] << std::endl;
+  }
   theApp.Run(true);
   canvas->Close();
-
+  
   return 0;
 
 }
