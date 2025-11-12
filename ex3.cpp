@@ -41,25 +41,29 @@
 #include <TLine.h>
 #include <TFile.h>
 #include <TLatex.h>
+#include <TH2F.h>
+#include <TF2.h>
 using namespace std;
 
 // ---------- GLOBALS ----------
 // Declare pointer to data as global
 // The use of global variables is a disfavored coding practice, but
 // in this case it will allow us to avoid writing more complex code
-TH2F *hdata;
-TH2F *hbkg;
 // also passing the fit function, to make the objective fcn more generic
 TF2 *fparam;
 
+ TFile *file = TFile::Open("fitInputs.root", "READ");
+  TH2F  *hdata = (TH2F*)file->Get("hdata");
+  TH2F  *hbkg = (TH2F*)file->Get("hbkg");
+  
 //-------------------------------------------------------------------------
 // The pdf to be fitted, here an exponential.
 // This is a convenient interface for associating the model
 // with a TF1 later
 //-------------------------------------------------------------------------
 double gauss2D(double *xyPtr, double par[]){
-	double x = xy[0];
-	double y = xy[1];
+	double x = xyPtr[0];
+	double y = xyPtr[1];
 	
 	double A = par[0];
 	double mux = par[1];
@@ -68,8 +72,8 @@ double gauss2D(double *xyPtr, double par[]){
 	double sigmay = par[4];
 	double cbkg = par[5];
 
-	double signal = A * exp(-pow((x-mu1)/sigma1, 2))
-			  * exp(-pow((y-mu2)/sigma2, 2));
+	double signal = A * exp(-pow((x-mux)/sigmax, 2))
+			  * exp(-pow((y-muy)/sigmay, 2));
 	double bkg = cbkg *hbkg->Interpolate(x,y);
 	return signal + bkg;
 }
@@ -146,119 +150,81 @@ int main(int argc, char **argv) {
   gStyle->SetLabelFont(42, "xyz");      // for axis labels (values)
   gROOT->ForceStyle();
   // ***************************************
-  TFile *file = TFile::Open("fitlnputs.root", "READ");
-  TH2F  *hdata = (TH2F*)file->Get("hdata");
-  TH2F  *hbkg = (TH2F*)file->Get("hbkg");
-  const int npar = 6;
+ const int npar = 6;
   double xmin = hdata->GetXaxis()->GetXmin();
   double xmax = hdata->GetXaxis()->GetXmax();
   double ymin = hdata->GetYaxis()->GetXmin();
   double ymax = hdata->GetYaxis()->GetXmax();
-  TF2* fitfunc  = new TF2("fitfunc", gauss2d, xmin, xmax, ymin, ymax, npar);
-  TString names[6] = {"A", "mux"}
+  TF2* fitfunc  = new TF2("fitfunc", gauss2D, xmin, xmax, ymin, ymax, npar);
+  TString names[npar] = {"A", "mux", "sigx", "muy","sigy", "cbkg"};
+  double par[npar] = {50, 3.4, 1.2, 2.0, 1.4, .4};
+  double stepSize[npar] = {0,0,0,0,0,0};
 
-
-  //-----------
-  //used chatGPT to help with parameter guessing
-  double par1[npar1] = {
-  	1.5e4, 80.0,3.5,.5e4,85.0,8.0
-  };
-  double stepSize1[npar1] = {1e4,.1,.1,1e4,.1,.1};
-  double minVal1[npar1] = {0,0,0,0,0,0};
-  double maxVal1[npar1] = {0,0,0,0,0,0};
-  TString parName1[npar1] = {"A1", "mu1", "sigma1", "A2","mu2","sigma2"};
-
-  TMinuit minuit1(npar1);
+  TMinuit minuit1(npar);
   minuit1.SetFCN(fcn);
 
-  fparam=gauss2;  // our model
+  fparam=fitfunc;  // our model
 
-  for (int i = 0; i<npar1; i++){
-  	minuit1.DefineParameter(i, parName1[i].Data(), par1[i], stepSize1[i], minVal1[i], maxVal1[i]);
+  for (int i = 0; i<npar; i++){
+  	minuit1.DefineParameter(i, names[i].Data(), par[i], stepSize[i], 0, 0);
   }
   // Do the minimization!
   minuit1.Migrad();       // Minuit's best minimization algorithm
 
   // Get the result
-  double outpar1[npar1], err1[npar1];
-  for (int i=0; i<npar1; i++){
+  double outpar1[npar], err1[npar];
+  for (int i=0; i<npar; i++){
     minuit1.GetParameter(i,outpar1[i],err1[i]);
   };
-  gauss2->SetParameters(outpar1);
-  double fmin1, fedm1, errdef1; 
-  int npari1, nparx1, istat1;
-  minuit1.mnstat(fmin1, fedm1, errdef1, npari1, nparx1, istat1);
+  fparam->SetParameters(outpar1);
 
-  const int npar2 = 3;
-  TF1 * gumbel = new TF1("gumbel", gumbelPDF, xmin, xmax, npar2);
-
-  double par2[npar2] = {1.0e4, 80.0, 5.0};
-  double stepSize2[npar2] = {1e3, 0.1, 0.1};
-  double minVal2[npar2] = {0,0,0};
-  double maxVal2[npar2] = {0,0,0};
-  TString parName2[npar2] = {"A", "mu","beta"};
-
-  TMinuit minuit2(npar2);
-  minuit2.SetFCN(fcn);
-  fparam = gumbel; 
-
-  for(int i = 0; i<npar2; i++){
-  	minuit2.DefineParameter(i, parName2[i].Data(), par2[i], stepSize2[i], minVal2[i], maxVal2[i]);
-  }
- 
-  minuit2.Migrad();
-
-  double outpar2[npar2], err2[npar2];
-  for (int i = 0; i < npar2; i++){
-  	minuit2.GetParameter(i, outpar2[i], err2[i]);
-  } 
-  gumbel->SetParameters(outpar2);
   double fmin2, fedm2, errdef2; 
   int npari2, nparx2, istat2;
-  minuit2.mnstat(fmin2, fedm2, errdef2, npari2, nparx2, istat2);
+  minuit1.mnstat(fmin2, fedm2, errdef2, npari2, nparx2, istat2);
 
-  int nbins = hdata->GetNbinsX();
-  int ndf_gauss = nbins - npar1;
-  int ndf_gumbel = nbins - npar2;
+  TCanvas *tc = new TCanvas("tc", "Canvas", 1200, 900);
+  tc->Divide(2,2);
 
-  double chi2_gauss = calcChi2(hdata, gauss2);
-  double chi2_gumbel = calcChi2(hdata, gumbel);
+  tc->cd(1);
+  hdata->Draw("lego2");
 
-  double p_gauss = TMath::Prob(chi2_gauss, ndf_gauss);
-  double p_gumbel = TMath::Prob(chi2_gumbel, ndf_gumbel);
+  tc->cd(2);
+  TH2F *hfit = (TH2F*)hdata->Clone("hfit");
+  hfit->Reset();
+  for(int ix = 1; ix<= hfit->GetNbinsX(); ix++){
+  	for (int iy = 1; iy <= hfit->GetNbinsY(); iy++){
+		double x = hfit->GetXaxis()->GetBinCenter(ix);
+		double y = hfit->GetYaxis()->GetBinCenter(iy);
+		double val = fparam->Eval(x,y);
+		hfit->SetBinContent(ix,iy,val);
+	}
+  }
+  hfit->SetTitle("Fit Results (Signal + Background)");
+  hfit->Draw("lego2");
 
-   TH1F *hdata1 = (TH1F*)hdata->Clone("hdata1");
-   TH1F *hdata2 = (TH1F*)hdata->Clone("hdata2");
-  canvas->Divide(2,1);
+  tc->cd(3);
+  TH2F *hres = (TH2F*)hdata->Clone("hres");
+  for (int ix = 1; ix <= hres->GetNbinsX(); ix++){
+  	for (int iy = 1; iy<=hres->GetNbinsY(); iy ++){
+		double difference = hdata->GetBinContent(ix, iy) - hfit->GetBinContent(ix,iy);
+		hres->SetBinContent(ix, iy, difference);
+	}
+  
+  }
+  hres->SetTitle("Residuals");
+  hres->Draw("lego2");
 
-  canvas->cd(1);
-  hdata1->SetTitle("Fit Using the Sum of Two Gaussian Functions");
-  hdata1->Draw("E");
-  gauss2->SetLineColor(kBlue);
-  gauss2->SetLineWidth(2);
-  gauss2->Draw("same");
-  TLatex stats1;
-  stats1.SetNDC();
-  stats1.SetTextSize(0.04);
-  stats1.DrawLatex(0.55, 0.85, Form("#chi^{2} = %.2f", chi2_gauss));
-  stats1.DrawLatex(0.55, 0.80, Form("ndf = %d", ndf_gauss));
-  stats1.DrawLatex(0.55, 0.75, Form("p = %f", p_gauss));
-  canvas->cd(2);
-  hdata2->SetTitle("Fit Using the Gumbel Function");
-  hdata2->Draw("E");
-  gumbel->SetLineColor(kPink);
-  gumbel->SetLineWidth(2);
-  gumbel->Draw("same");
 
-  TLatex stats2;
-  stats2.SetNDC();
-  stats2.SetTextSize(0.04);
-  stats2.DrawLatex(0.55, 0.85, Form("#chi^{2} = %.2f", chi2_gumbel));
-  stats2.DrawLatex(0.55, 0.80, Form("ndf = %d", ndf_gumbel));
-  stats2.DrawLatex(0.55, 0.75, Form("p = %f", p_gumbel));
- 
-  canvas->SaveAs("ex1_plots.png");
- theApp.SetIdleTimer(30,".q");  // set up a failsafe timer to end the program
+  tc->cd(4);
+  TH2F *hbkg_best = (TH2F*)hbkg->Clone("hbkg_best");
+  hbkg_best->Scale(fparam->GetParameter(5));
+  TH2F *hsub = (TH2F*)hdata->Clone("hsub");
+  hsub->Add(hbkg_best, -1);
+  hsub->SetTitle("Data After Subtracting the Best Fit Background");
+  hsub->Draw("lego2");
+
+  tc->SaveAs("ex3_fig.png");
+  theApp.SetIdleTimer(30,".q");  // set up a failsafe timer to end the program
   theApp.Run(true);
   canvas->Close();
 
