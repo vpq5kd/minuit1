@@ -228,6 +228,21 @@ int main(int argc, char **argv) {
   for (int i = 0; i<npar;i++){
   	std::cout << names[i] << "=" << outpar1[i] << "+/-" << err1[i] << std::endl;
   }
+
+  double A = outpar1[0];
+  double sigx = outpar1[2];
+  double sigy = outpar1[4];
+
+  double nsignal = A * 2 * M_PI * sigx * sigy;
+  std::cout << "number of signal events = " << nsignal << std::endl;
+  
+  double errA = err1[0];
+  double errsigx = err1[2];
+  double errsigy = err1[4];
+
+  double error = nsignal * sqrt(pow(errA/A,2) + pow(errsigx/sigx, 2) + pow(errsigy/sigy, 2) );
+
+  std::cout << "number of signal events error = " << error << std::endl;
   theApp.Run(true);
   canvas->Close();
   
