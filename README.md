@@ -11,7 +11,7 @@
 Team member names and computing IDs: Sophia Spaner (VPQ5KD)
 
 -----
-**Disclaimer:** Rather than put a chatGPT credit in each of my files, I am putting one in the README. Like other assignments, I used chatGPT to aid in both the development of this work and in my understanding of the assignment. I am able to explain any part of my code if needed.
+**Disclaimer:** Rather than put a chatGPT credit in each of my files, I am putting one in the README. Like other assignments, I used chatGPT to aid in both the development of this work and in my understanding of this assignment. I am able to explain any part of my code if needed.
 
 Exercise 2 comments:
 --
