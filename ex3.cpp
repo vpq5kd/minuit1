@@ -48,6 +48,7 @@ using namespace std;
 // The use of global variables is a disfavored coding practice, but
 // in this case it will allow us to avoid writing more complex code
 TH2F *hdata;
+TH2F *hbkg;
 // also passing the fit function, to make the objective fcn more generic
 TF2 *fparam;
 
@@ -61,15 +62,16 @@ double gauss2D(double *xyPtr, double par[]){
 	double y = xy[1];
 	
 	double A = par[0];
-	double mu1 = par[1];
-	double mu2 = par[2];
-	double sigma1 = par[3];
-	double sigma2 = par[4];
-	double B = par[5];
+	double mux = par[1];
+	double sigmax = par[2];
+	double muy = par[3];
+	double sigmay = par[4];
+	double cbkg = par[5];
 
 	double signal = A * exp(-pow((x-mu1)/sigma1, 2))
 			  * exp(-pow((y-mu2)/sigma2, 2));
-	return signal + B;
+	double bkg = cbkg *hbkg->Interpolate(x,y);
+	return signal + bkg;
 }
 // This is our OBJECTIVE Function
 // return NLL given a histogram and function
@@ -88,7 +90,7 @@ double calcNLL(TH1F* h, TF1* f){
 }
 
 //utilized chatGPT to aid with creating the chi^two function
-double calcChi2(TH2F *h, TF1 *f){
+double calcChi2(TH2F *h, TF2 *f){
 	double chi2 = 0.0;
 	for (int ix = 1; ix <= h->GetNbinsX(); ix++){
 		for (int iy = 1; iy <= h->GetNbinsY(); iy++){
@@ -147,15 +149,16 @@ int main(int argc, char **argv) {
   TFile *file = TFile::Open("fitlnputs.root", "READ");
   TH2F  *hdata = (TH2F*)file->Get("hdata");
   TH2F  *hbkg = (TH2F*)file->Get("hbkg");
+  const int npar = 6;
+  double xmin = hdata->GetXaxis()->GetXmin();
+  double xmax = hdata->GetXaxis()->GetXmax();
+  double ymin = hdata->GetYaxis()->GetXmin();
+  double ymax = hdata->GetYaxis()->GetXmax();
+  TF2* fitfunc  = new TF2("fitfunc", gauss2d, xmin, xmax, ymin, ymax, npar);
+  TString names[6] = {"A", "mux"}
 
-  double xmin = hexp->GetXaxis()->GetXmin();
-  double xmax = hexp->GetXaxis()->GetXmax();
 
-  hdata = hexp;
-
-  hdata->Sumw2(); // -> chatGPT suggestion to fix non-fitting problem 
-  const int npar1 = 6;
-  TF1* gauss2 = new TF1("gauss2", doubleGauss, xmin, xmax, npar1);
+  //-----------
   //used chatGPT to help with parameter guessing
   double par1[npar1] = {
   	1.5e4, 80.0,3.5,.5e4,85.0,8.0
